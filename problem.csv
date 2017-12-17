@@ -1,0 +1,7 @@
+name,age,birthday,gender
+John,26,26-01-1995,male
+Lisa,xyz,26-01-1996,female
+,26,26-01-1995,male
+Julia,,26-01-1995,female
+ ,,26-01-1995,
+Pete,,26-01-1995,

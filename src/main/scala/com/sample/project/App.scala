@@ -2,12 +2,19 @@ package com.sample.project
 
 
 
+import jdk.nashorn.internal.parser.JSONParser
 import org.apache.spark.sql.types.DateType
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession}
 import org.apache.spark.sql.functions.unix_timestamp
 import org.apache.spark.sql.functions.{to_date, to_timestamp}
 import org.apache.spark.sql.functions.countDistinct
+
 import scala.collection.mutable
+import org.apache.spark.sql.functions.{collect_list, collect_set}
+
+import scala.util.parsing.json.JSONObject
+import org.apache.spark.sql.functions.approx_count_distinct
+import org.apache.spark.sql._
 
 
 /**
@@ -21,6 +28,16 @@ case class columnName(
                        date_expression: Option[String] = None){
 
 }
+
+case class output(
+                   Column:String,
+                   Unique_values : String,
+                   Values: Option[String]
+                 )
+                       {
+
+}
+
 
 object App  {
   def main(args: Array[String]): Unit = {
@@ -54,8 +71,10 @@ object App  {
 
     val step3=process.step3(step1,newCol)
 
-    println("++++++++++++++++++++++++++++++++++=============================++++++++++++++++++++++")
-    step3.describe().show()
+    println(step3)
+
+
+
 
 
   }
@@ -77,10 +96,10 @@ class Process(private val spark:SparkSession){
     rawData.na.drop()
   }
 
-  def step3(proceessData: DataFrame, z: Array[columnName]): DataFrame ={
+  def step3(proceessData: DataFrame, z: Array[columnName]): String ={
 
     var newColumns :DataFrame =proceessData;
-    for ( a <- 0 to z.size-1){
+    for ( a <-0 to z.size-1){
       newColumns = newColumns.withColumnRenamed(z(a).existing_col_name,z(a).new_col_name)
     }
     var newColumNameDate:String=null
@@ -108,19 +127,32 @@ class Process(private val spark:SparkSession){
       $"$newColumNameDate", newColumnDateFormat.toString
     ).cast("timestamp")).alias("timestamp"))
 
-    step4(newColumns,newColName2)
-    newColumns
+    val outStr= step4(newColumns,newColName2)
+    outStr
 
   }
 
-  def step4(newData: DataFrame, z: Array[String]):DataFrame ={
+  def step4(newData: DataFrame, z: Array[String]):String ={
     var comedat:DataFrame=newData
+    var comedat1:DataFrame=null;
+    var outputString:String="";
+    val whereami = System.getProperty("user.dir")
       for(i<-0 to z.size-1){
-         comedat.agg(countDistinct(z(i))).show()
-        comedat.groupBy(z(i)).count()
+        val outputJs= comedat.agg(approx_count_distinct(z(i)).alias("Unique_values"),collect_list(z(i)).alias("Values")).first()
+        convertRowToJSON(outputJs,z(i))
+
+        def convertRowToJSON(row: Row,s1:String): String = {
+
+          val m = row.getValuesMap(row.schema.fieldNames)
+
+          var intermediate=JSONObject(m);
+          val addintermediate =intermediate.obj.updated("Column",s1)
+          outputString =JSONObject(addintermediate).toString()+"\n"+outputString
+          JSONObject(m).toString()
+        }
       }
-    comedat.show()
-      newData
+     comedat.show()
+    outputString
   }
 
 }

@@ -3,11 +3,13 @@ package com.sample.project
 
 
 import org.apache.spark.sql.types.DateType
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions.unix_timestamp
 import org.apache.spark.sql.functions.{to_date, to_timestamp}
 import org.apache.spark.sql.functions.countDistinct
+
 import scala.collection.mutable
+import scala.util.parsing.json.JSONObject
 
 
 /**
@@ -54,8 +56,8 @@ object App  {
 
     val step3=process.step3(step1,newCol)
 
-    println("++++++++++++++++++++++++++++++++++=============================++++++++++++++++++++++")
-    step3.describe().show()
+    println("++++++++++++++++++++++++++++++++++=============================++++++++++++++++++++++\n",step3)
+
 
 
   }
@@ -77,7 +79,7 @@ class Process(private val spark:SparkSession){
     rawData.na.drop()
   }
 
-  def step3(proceessData: DataFrame, z: Array[columnName]): DataFrame ={
+  def step3(proceessData: DataFrame, z: Array[columnName]): String ={
 
     var newColumns :DataFrame =proceessData;
     for ( a <- 0 to z.size-1){
@@ -109,18 +111,32 @@ class Process(private val spark:SparkSession){
     ).cast("timestamp")).alias("timestamp"))
 
     step4(newColumns,newColName2)
-    newColumns
+
 
   }
 
-  def step4(newData: DataFrame, z: Array[String]):DataFrame ={
+  def step4(newData: DataFrame, z: Array[String]):String ={
     var comedat:DataFrame=newData
+    var strOut:String=""
       for(i<-0 to z.size-1){
-         comedat.agg(countDistinct(z(i))).show()
+
+        val a= comedat.agg(functions.approx_count_distinct(z(i)).alias("UniqueValues"),functions.collect_list(z(i)).alias("Values")).first()
+        convertRowToJSON(a,z(i))
+        def convertRowToJSON(row: Row,str:String): String = {
+          val m = row.getValuesMap(row.schema.fieldNames)
+
+          val rawObj=JSONObject(m)
+          println(rawObj)
+          var finalObj=  rawObj.obj.updated("Columns",z(i))
+          strOut= JSONObject(finalObj).toString()+"\n" +strOut
+          println(rawObj.obj.updated("Columns",z(i)).toString())
+          strOut
+        }
+
         comedat.groupBy(z(i)).count()
       }
     comedat.show()
-      newData
+    strOut
   }
 
 }
